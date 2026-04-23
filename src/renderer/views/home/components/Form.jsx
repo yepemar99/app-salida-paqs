@@ -53,7 +53,7 @@ const SalidaTuboForm = ({ data, handleConfirm, handleCancel }) => {
   const [tubos, setTubos] = useState([]);
   const [loadingTubos, setLoadingTubos] = useState(false);
   const { operarios, tiposCalidad } = useContext(DataContext);
-  const [listadoSalidas, setListadoSalidas] = useState([]); // El "subformulario" de Access
+  const [listadoSalidas, setListadoSalidas] = useState([]);
 
   const methods = useForm({
     resolver: zodResolver(salidaSchema),
@@ -70,6 +70,7 @@ const SalidaTuboForm = ({ data, handleConfirm, handleCancel }) => {
   const { handleSubmit, watch, setValue, reset } = methods;
   const watchCalidadId = watch('calidad_id');
   const watchTuboId = watch('tubo_id');
+  const watchFecha = watch('fecha');
 
   const loadTubos = async (calidadId) => {
     if (!calidadId) return;
@@ -86,11 +87,45 @@ const SalidaTuboForm = ({ data, handleConfirm, handleCancel }) => {
     }
   };
 
+  const loadSalidasByFecha = async (fecha) => {
+    if (!fecha) return;
+    try {
+      const result = await window.api.salidasPaq.getAll({
+        page: 1,
+        pageSize: 50,
+        fecha,
+      });
+
+      if (!result?.success) {
+        throw new Error(result?.error || 'No se pudieron cargar las salidas');
+      }
+
+      const rows = (result?.data || []).map((row, index) => ({
+        ...row,
+        id: row.id || `${row.fecha}-${row.tubo_id}-${index}`,
+        medida: row.medida || `Tubo ID ${row.tubo_id}`,
+        num_paqs: row.num_paqs ?? row.total_num_paqs ?? 0,
+        nombre_operario: row.nombre_operario || '-',
+      }));
+
+      setListadoSalidas(rows);
+    } catch (err) {
+      toast.error('Error al cargar salidas por fecha');
+      setListadoSalidas([]);
+    }
+  };
+
   useEffect(() => {
     if (watchCalidadId) {
       loadTubos(watchCalidadId);
     }
   }, [watchCalidadId]);
+
+  useEffect(() => {
+    if (watchFecha) {
+      loadSalidasByFecha(watchFecha);
+    }
+  }, [watchFecha]);
 
   const onSubmit = async (formData) => {
     try {
@@ -107,11 +142,15 @@ const SalidaTuboForm = ({ data, handleConfirm, handleCancel }) => {
 
       setValue('tubo_id', '');
       setValue('num_paqs', 1);
+      await loadSalidasByFecha(formData.fecha);
       toast.success('Operación registrada correctamente');
     } catch (error) {
       toast.error('Error al procesar la salida');
     }
   };
+
+  //comentario
+  console.log('Renderizando Formulario de Salida - Tubos', listadoSalidas);
 
   return (
     <FormProvider {...methods}>
