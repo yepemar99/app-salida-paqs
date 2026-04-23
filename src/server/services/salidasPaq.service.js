@@ -64,3 +64,26 @@ export const listarSalidasPaq = async ({ page = 1, pageSize = 10, fecha }) => {
     throw error;
   }
 };
+
+export const crearSalidaPaquetes = async ({
+  operario_id,
+  tubo_id,
+  num_paqs,
+}) => {
+  try {
+    const conn = database.getConnection();
+    const insertQuery = `
+      INSERT INTO Salidas_Paqs_Tubos (operario_id, tubo_id, num_paqs)
+      VALUES (?, ?, ?)
+    `;
+    const result = await conn.query(insertQuery, [
+      operario_id,
+      tubo_id,
+      num_paqs,
+    ]);
+    return { id: result.insertId };
+  } catch (error) {
+    console.error('Error creando salida de paquetes:', error.message);
+    throw error;
+  }
+};
