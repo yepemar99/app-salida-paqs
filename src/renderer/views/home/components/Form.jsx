@@ -15,7 +15,7 @@ import {
   TableRow,
   TableCell,
   TableBody,
-  IconButton,
+  TablePagination,
 } from '@mui/material';
 import {
   Person,
@@ -23,7 +23,6 @@ import {
   Save,
   Close,
   Inventory,
-  Delete,
 } from '@mui/icons-material';
 import TextField from '../../../components/common/Textfield';
 import Select from '../../../components/common/Select';
@@ -54,6 +53,9 @@ const SalidaTuboForm = ({ data, handleConfirm, handleCancel }) => {
   const [loadingTubos, setLoadingTubos] = useState(false);
   const { operarios, tiposCalidad } = useContext(DataContext);
   const [listadoSalidas, setListadoSalidas] = useState([]);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalSalidas, setTotalSalidas] = useState(0);
 
   const methods = useForm({
     resolver: zodResolver(salidaSchema),
@@ -87,12 +89,16 @@ const SalidaTuboForm = ({ data, handleConfirm, handleCancel }) => {
     }
   };
 
-  const loadSalidasByFecha = async (fecha) => {
+  const loadSalidasByFecha = async (
+    fecha,
+    requestedPage = page,
+    requestedPageSize = pageSize,
+  ) => {
     if (!fecha) return;
     try {
       const result = await window.api.salidasPaq.getAll({
-        page: 1,
-        pageSize: 50,
+        page: requestedPage + 1,
+        pageSize: requestedPageSize,
         fecha,
       });
 
@@ -109,9 +115,11 @@ const SalidaTuboForm = ({ data, handleConfirm, handleCancel }) => {
       }));
 
       setListadoSalidas(rows);
+      setTotalSalidas(Number(result?.total) || 0);
     } catch (err) {
       toast.error('Error al cargar salidas por fecha');
       setListadoSalidas([]);
+      setTotalSalidas(0);
     }
   };
 
@@ -122,10 +130,15 @@ const SalidaTuboForm = ({ data, handleConfirm, handleCancel }) => {
   }, [watchCalidadId]);
 
   useEffect(() => {
-    if (watchFecha) {
-      loadSalidasByFecha(watchFecha);
+    if (!watchFecha) return;
+
+    if (page !== 0) {
+      setPage(0);
+      return;
     }
-  }, [watchFecha]);
+
+    loadSalidasByFecha(watchFecha, page, pageSize);
+  }, [watchFecha, page, pageSize]);
 
   const onSubmit = async (formData) => {
     try {
@@ -142,15 +155,12 @@ const SalidaTuboForm = ({ data, handleConfirm, handleCancel }) => {
 
       setValue('tubo_id', '');
       setValue('num_paqs', 1);
-      await loadSalidasByFecha(formData.fecha);
+      await loadSalidasByFecha(formData.fecha, page, pageSize);
       toast.success('Operación registrada correctamente');
     } catch (error) {
       toast.error('Error al procesar la salida');
     }
   };
-
-  //comentario
-  console.log('Renderizando Formulario de Salida - Tubos', listadoSalidas);
 
   return (
     <FormProvider {...methods}>
@@ -302,12 +312,6 @@ const SalidaTuboForm = ({ data, handleConfirm, handleCancel }) => {
                       <TableCell sx={{ bgcolor: '#eee', fontWeight: 'bold' }}>
                         Operario
                       </TableCell>
-                      <TableCell
-                        align="right"
-                        sx={{ bgcolor: '#eee', fontWeight: 'bold' }}
-                      >
-                        Acciones
-                      </TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -316,21 +320,12 @@ const SalidaTuboForm = ({ data, handleConfirm, handleCancel }) => {
                         <TableCell>{item.medida}</TableCell>
                         <TableCell align="center">{item.num_paqs}</TableCell>
                         <TableCell>{item.nombre_operario}</TableCell>
-                        <TableCell align="right">
-                          <IconButton
-                            color="error"
-                            size="small"
-                            onClick={() => {}}
-                          >
-                            <Delete fontSize="inherit" />
-                          </IconButton>
-                        </TableCell>
                       </TableRow>
                     ))}
                     {listadoSalidas.length === 0 && (
                       <TableRow>
                         <TableCell
-                          colSpan={4}
+                          colSpan={3}
                           align="center"
                           sx={{ py: 3, color: 'gray' }}
                         >
@@ -341,6 +336,19 @@ const SalidaTuboForm = ({ data, handleConfirm, handleCancel }) => {
                   </TableBody>
                 </Table>
               </TableContainer>
+              <TablePagination
+                component="div"
+                count={totalSalidas}
+                page={page}
+                onPageChange={(_, newPage) => setPage(newPage)}
+                rowsPerPage={pageSize}
+                onRowsPerPageChange={(event) => {
+                  setPageSize(parseInt(event.target.value, 10));
+                  setPage(0);
+                }}
+                rowsPerPageOptions={[5, 10, 20, 50]}
+                labelRowsPerPage="Filas por página"
+              />
             </Paper>
           </Grid>
         </Grid>
